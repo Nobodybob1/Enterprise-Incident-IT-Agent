@@ -14,7 +14,7 @@ EMBED_MODEL = "voyage-3"
 vo = voyageai.Client()
 qdrant = QdrantClient(path="qdrant_data")
 
-def retrieve(query: str, top_k: int = 2):
+def retrieve(query: str, top_k: int = 2, min_score: float = 0.3):
     query_embedding = vo.embed([query], model=EMBED_MODEL, input_type="query").embeddings[0]
 
     results = qdrant.query_points(
@@ -23,10 +23,12 @@ def retrieve(query: str, top_k: int = 2):
         limit=top_k
     )
 
-    return [
+    matches = [
         {"filename": r.payload["filename"], "text": r.payload["text"], "score": r.score}
         for r in results.points
+        if r.score >= min_score
     ]
+    return matches
 
 if __name__ == "__main__":
     # Manual test
