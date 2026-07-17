@@ -11,3 +11,5 @@ class IncidentState(TypedDict):
     runbook_context: Optional[str]
     tool_result: Optional[str]
     proposal: Optional[str]
+    approved: Optional[bool]
+    action_result: Optional[str]

@@ -9,6 +9,7 @@ from dotenv import load_dotenv
 
 from rag.retrieve import retrieve
 from tools.mock_tools import check_service_status, MOCK_SERVICES
+from langgraph.types import interrupt
 
 load_dotenv()
 client = Anthropic(api_key=os.environ.get("ANTHROPIC_API_KEY"))
@@ -87,3 +88,26 @@ def propose_node(state):
     )
     proposal = _extract_text(response)
     return {"proposal": proposal}
+
+def await_approval_node(state):
+    """
+    Pause here and wait for a human yes/no on the proposed action.
+    """
+    decision = interrupt({
+        "question": f"Approve the proposed action for {state['service_name']}?",
+        "proposal": state['proposal']
+    })
+    approved = str(decision).strip().lower() in ("yes", "y", "approve")
+    return {"approved": approved}
+
+def execute_action_node(state):
+    """
+    Mock 'execute' step. We never actually restart anything real -
+    this just simulates what would happen, gated entirely by human approval.
+    """
+    if state.get("approved"):
+        result = f"[MOCK ACTION] Restarting {state['service_name']}... done (simulated)."
+    else:
+        result = f"[CANCELLED] No action taken on {state['service_name']}. Flagged for further human review."
+    print(f"[Execute] {result}")
+    return {"action_result": result}

@@ -1,106 +1,44 @@
-import os
-import json
-from dotenv import load_dotenv
-from anthropic import Anthropic
-from tools.mock_tools import check_service_status
+"""
+Each message you type is treated as a new incident
+report and run through the full pipeline: triage -> diagnose -> retrieve
+-> propose -> human approval -> execute.
+"""
 
-# Load API key
-load_dotenv()
+import uuid
+from langgraph.types import Command
+from graph.workflow import workflow
 
-client = Anthropic(api_key=os.environ.get("ANTHROPIC_API_KEY"))
+def handle_incident(user_message: str):
+    thread_id = str(uuid.uuid4())
+    config = {"configurable": {"thread_id": thread_id}}
 
-# Model to use
-MODEL = "claude-sonnet-5"
+    result = workflow.invoke({"user_message": user_message}, config=config)
 
-SYSTEM_PROMPT = (
-    "You are an IT incident assistant. You have access to a tool that "
-    "checks the status of enterprise services. Use it when the user asks "
-    "about a specific service's health or status"
-)
+    if "__interrupt__" in result:
+        interrupt_info = result["__interrupt__"][0].value
+        print("\n" + interrupt_info["proposal"])
+        print(f"\n{interrupt_info['question']}")
 
-# Tool schema
-TOOLS = [
-    {
-        "name": "check_service_status",
-        "description": "Check the current status, CPU usage, and last restart time of an enterprise service.",
-        "input_schema": {
-            "type": "object",
-            "properties": {
-                "service_name": {
-                    "type": "string",
-                    "description": "The name of the service to check, e.g. 'nginx', 'database', 'auth-service'.",
-                }
-            },
-            "required": ["service_name"]
-        },
-    }
-]
+        answer = input("Your answer (yes/no): ").strip()
+        final_result = workflow.invoke(Command(resume=answer), config=config)
 
-# Map tool names to the actual Python functions that implement them
-AVAILABLE_TOOLS = {
-    "check_service_status": check_service_status,
-}
+        print(f"\n{final_result['action_result']}\n")
+    else:
+        print(f"\n{result['proposal']}\n")
 
-def run_tool(tool_name, tool_input):
-    "Execute the requested tool and return its result"
-    func = AVAILABLE_TOOLS[tool_name]
-    return func(**tool_input)
-
-def chat():
-    print("IT Incident Agent - Stage 3")
-    print ("Type 'quit' to exit.\n")
-
-    # We keep the full message history so the model has conversational
-    # context. Each entry is a dict with a role ("user" or "assistant")
-    # and content (the text)
-    messages = []
+def main():
+    print("IT Incident Agent")
+    print("Describe an incident (or type 'quit' to exit).\n")
 
     while True:
-        user_input = input("You: ").strip()
+        user_input = input("Incident: ").strip()
         if user_input.lower() in ("quit", "exit"):
             break
         if not user_input:
             continue
 
-        messages.append({"role": "user", "content": user_input})
+        handle_incident(user_input)
 
-        while True:
-            response = client.messages.create(
-                model=MODEL,
-                max_tokens=1024,
-                system=SYSTEM_PROMPT,
-                tools=TOOLS,
-                messages=messages,
-            )
 
-            # Add Claude's response
-            messages.append({"role": "assistant", "content": response.content})
-
-            if response.stop_reason == "tool_use":
-                # Find the tool_use block(s) and run them
-                tool_results = []
-                for block in response.content:
-                    if block.type == "tool_use":
-                        print(f"[Agent is calling tool: {block.name}({block.input})]")
-                        result = run_tool(block.name, block.input)
-                        tool_results.append({
-                            "type": "tool_result",
-                            "tool_use_id": block.id,
-                            "content": json.dumps(result),
-                        })
-                
-                # Send the tool result(s) back to Claude so Claude can continue
-                messages.append({"role": "user", "content": tool_results})
-                continue
-
-            else:
-                # Claude gave a normal text answer - print it and break the inner loop
-                reply_text = "".join(
-                    block.text for block in response.content if block.type == "text"
-                )
-                print(f"Agent: {reply_text}\n")
-                break
-
-        
 if __name__ == "__main__":
-    chat()
+    main()
