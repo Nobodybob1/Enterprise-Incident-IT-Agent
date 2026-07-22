@@ -59,26 +59,32 @@ def retrieve_node(state):
     # even if the user;s own phrasing was vague.
     search_query = f"{state['user_message']} {status_summary}"
 
-    matches = retrieve(search_query, top_k=2, min_score=0.3)
+    matches = retrieve(search_query, top_k=3, min_score=0.3)
     if matches:
-        context = "\n\n---\n\n".join(m["text"] for m in matches)
-        filenames = [m["filename"] for m in matches]
+        labeled_parts = []
+        for m in matches:
+            label = "RUNBOOK" if m["source"] == "runbook" else "PAST INCIDENT TICKET"
+            labeled_parts.append(f"[{label}: {m['filename']}]\n{m['text']}")
+        context = "\n\n---\n\n".join(labeled_parts)
     else:
-        context = "No sufficiently relevant runbook found."
-        filenames = []
+        context = "No sufficiently relevant runbook or past ticket found."
 
     print(f"[Retrieve] Search query used: '{search_query}'")
-    print(f"[Retrieve] Runbooks used: {[(m['filename'], round(m['score'], 3)) for m in matches]}")
+    print(f"[Retrieve] Sources used: {[(m['source'], m['filename'], round(m['score'], 3)) for m in matches]}")
     return {"runbook_context": context}
 
 def propose_node(state):
     """Ask Claude to propose a fix, grounded in the runbook + live status."""
     prompt = (
         f"User's incident report: \"{state['user_message']}\"\n\n"
-        f"Relevant runbook:\n{state['runbook_context']}\n\n"
+        f"Relevant runbook(s) and/or past incident tickets:\n{state['runbook_context']}\n\n"
         f"Live service status: {json.dumps(state['tool_result'])}\n\n"
-        "Based on the runbook and the live status above, propose a specific "
-        "fix. Be concise and reference the runbook's steps where relevant."
+        "Based on the information above, propose a specific fix. Be concise. "
+        "If a runbook is present, treat it as the official procedure and "
+        "reference its steps where relevant. If a past incident ticket is "
+        "also present, you may mention how a similar incident was resolved "
+        "before, but the runbooks's steps take priority if the two suggest "
+        "different actions."
     )
 
     response = client.messages.create(

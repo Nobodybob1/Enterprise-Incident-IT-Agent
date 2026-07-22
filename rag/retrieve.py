@@ -24,7 +24,7 @@ def retrieve(query: str, top_k: int = 2, min_score: float = 0.3):
     )
 
     matches = [
-        {"filename": r.payload["filename"], "text": r.payload["text"], "score": r.score}
+        {"filename": r.payload["filename"], "text": r.payload["text"], "source": r.payload.get("source", "runbook"),"score": r.score} # Backward compatible with old points.
         for r in results.points
         if r.score >= min_score
     ]

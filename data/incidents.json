@@ -1,0 +1,58 @@
+[
+  {
+    "ticket_id": "INC-1042",
+    "service": "nginx",
+    "date": "2025-11-03",
+    "title": "nginx returning 504 timeouts under load",
+    "description": "Health checks began failing around 14:20 UTC. Requests were timing out after 30s. No recent config changes were logged.",
+    "resolution": "Restarted nginx, which cleared the timeouts. Root cause traced to a stuck connection pool from a downstream dependency. Added a connection pool timeout in the next release."
+  },
+  {
+    "ticket_id": "INC-1058",
+    "service": "nginx",
+    "date": "2025-12-19",
+    "title": "nginx unresponsive after deploy",
+    "description": "Users reported the app hanging on load. Health endpoint returned 503. A deploy had gone out 10 minutes earlier.",
+    "resolution": "Rolled back the deploy, which restored service within 2 minutes. Root cause was a missing environment variable in the new build that caused nginx to fail silently on startup."
+  },
+  {
+    "ticket_id": "INC-1071",
+    "service": "database",
+    "date": "2025-10-22",
+    "title": "database disk usage hit 95%",
+    "description": "Disk space alert fired for the database volume. Writes began failing intermittently once usage crossed 95%.",
+    "resolution": "Cleared old WAL archive files and expanded the volume by 50GB. Recommended setting up automated archive cleanup going forward."
+  },
+  {
+    "ticket_id": "INC-1090",
+    "service": "database",
+    "date": "2026-01-08",
+    "title": "database disk full, writes rejected",
+    "description": "Application errors began appearing referencing 'no space left on device'. Disk usage was at 99%.",
+    "resolution": "Deleted rotated log files older than 30 days and archived a large unused table to cold storage, which freed enough space to restore normal operation."
+  },
+  {
+    "ticket_id": "INC-1103",
+    "service": "auth-service",
+    "date": "2025-09-30",
+    "title": "auth-service CPU pegged at 100%",
+    "description": "CPU usage on auth-service climbed to 100% and stayed there for over an hour. The login queue backed up significantly.",
+    "resolution": "Identified a runaway job stuck in a retry loop due to a malformed token payload. Killed the job and added payload validation before allowing retries."
+  },
+  {
+    "ticket_id": "INC-1117",
+    "service": "auth-service",
+    "date": "2026-02-14",
+    "title": "auth-service high CPU and slow login processing",
+    "description": "CPU usage stayed around 91% for several hours, slowing login processing noticeably. No single request appeared to be stuck.",
+    "resolution": "Traced to an inefficient token-validation query added in a recent release that was being called far more often than expected. Reverted the change and cached validation results instead."
+  },
+  {
+    "ticket_id": "INC-1129",
+    "service": "auth-service",
+    "date": "2026-03-02",
+    "title": "auth-service degraded and unresponsive with elevated CPU",
+    "description": "auth-service began responding slowly and intermittently timing out while CPU usage was also elevated around 90%. It was unclear whether the CPU spike caused the degraded responses or the reverse.",
+    "resolution": "Restarted the service, which resolved both symptoms simultaneously. The post-mortem suggested a memory leak was driving up CPU usage until the process became degraded and unresponsive."
+  }
+]
