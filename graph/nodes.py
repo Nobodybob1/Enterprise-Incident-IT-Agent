@@ -59,7 +59,7 @@ def retrieve_node(state):
     # even if the user;s own phrasing was vague.
     search_query = f"{state['user_message']} {status_summary}"
 
-    matches = retrieve(search_query, top_k=3, min_score=0.3)
+    matches = retrieve(search_query, service_name=state.get("service_name"), top_k=3, min_score=0.3)
     if matches:
         labeled_parts = []
         for m in matches:
